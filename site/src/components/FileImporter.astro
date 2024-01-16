@@ -1,0 +1,74 @@
+---
+interface Props {
+	desc: string;
+}
+
+const { desc } = Astro.props;
+---
+<!-- Form to import file into the browser's localstorage -->
+<input type="file" class="history-importer" multiple accept=".json"/>
+<ul id="storage-list">
+
+</ul>
+<script>
+function update() {
+    const ul = document.getElementById("storage-list")!;
+    const index = JSON.parse(localStorage.getItem("index") || "{}");
+    ul.innerHTML = "";
+    const storage = window.localStorage;
+    for (const filename of Object.keys(index)) {
+        const li = document.createElement("li");
+        li.innerHTML = filename + " - " + index[filename].startTime + " to " + index[filename].endTime;
+        ul.appendChild(li);
+    }
+}
+
+function get_song_interval({endTime, msPlayed}: {endTime: string, msPlayed: number}): [Date, Date]{
+    return convert_to_start(endTime, msPlayed);
+}
+
+function convert_to_start(endTime: string, msPlayed: number): [Date, Date] {
+    // Convert "endTime" : "2023-08-16 20:02", to a timestamp
+    const end = new Date(endTime);
+    // Computes the startTime from the msPlayed
+    const start = new Date(end.getTime() - msPlayed);
+    return [start, end];
+}
+
+function index_history(name: string, content:string) {
+    console.log("Indexing history: " + name);
+    // history = json.load(content)
+    let history = JSON.parse(content);
+    // Find the interval of time between the first and last songs of the history
+    const start = get_song_interval(history[0])[0].toDateString();
+    const end = get_song_interval(history[history.length-1])[1].toDateString();
+    const saved_index = localStorage.getItem("index") || "{}";
+    let index = JSON.parse(saved_index);
+    const entry = {
+        'startTime': start,
+        'endTime': end
+    }
+    index[name] = entry;
+    localStorage.setItem("index", JSON.stringify(index));
+    update();
+}
+
+const file_inputs = document.querySelectorAll(".history-importer");
+for (const node of file_inputs) {
+    node.addEventListener("change", (e: Event) => {
+        const files = (node as HTMLInputElement).files;
+        for (let i = 0; i < files!.length; i++) {
+            const file = files![i];
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const content = e.target!.result;
+                localStorage.setItem(file.name, content as string);
+                index_history(file.name, content as string);
+            };
+            reader.readAsText(file);
+        }
+    });
+};
+
+    
+</script>
